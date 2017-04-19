@@ -1,0 +1,45 @@
+# Возможно, логика ansible_default_ipv4.interface = гейт в wan не совсем верна, об этом можно ещё подумать :3
+
+- hosts: localhost
+
+  tasks:
+    - name: enable IP forwarding
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: 1
+        sysctl_set: yes
+        state: present
+        reload: yes
+
+    - name: enable masquerade on outgoing interface
+      iptables:
+        table: nat
+        chain: POSTROUTING
+        out_interface: "{{ ansible_default_ipv4.interface }}"
+        jump: MASQUERADE
+      become: true
+      
+    - name: enable ctstate controlling on interface
+      iptables: 
+        # table: nat
+        chain: FORWARD
+        ctstate: ESTABLISHED,RELATED
+        jump: ACCEPT
+      become: true
+
+    - name: enable in port and out port forwarding
+      iptables: 
+        # table: nat
+        chain: FORWARD
+        in_interface: "{{ item[1] }}"
+        out_interface: "{{ ansible_default_ipv4.interface }}"
+        jump: ACCEPT
+      become: true
+      with_indexed_items:
+        - "{{ ansible_interfaces }}"
+      when: item[1] != "{{ ansible_default_ipv4.interface }}"
+
+
+
+
+    - debug: msg="{{ ansible_default_ipv4.interface }} {{ ansible_all_ipv4_addresses }} {{ ansible_interfaces[0] }}"
